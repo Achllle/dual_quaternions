@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>dual_quaternions</name>
+  <version>0.3.0</version>
+  <description>dual quaternion operations</description>
+
+  <maintainer email="achille.verheye@gmail.com">achille</maintainer>
+  <license>MIT</license>
+  <!-- <url type="website">http://wiki.ros.org/dual_quaternions</url> -->
+  <author email="achille.verheye@gmail.com">achille</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>pyquaternion</exec_depend>
+
+</package>

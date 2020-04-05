@@ -18,8 +18,7 @@ representing numbers (or in this case quaternions) very similar to complex numbe
 This allows e.g. multiplication of two dual quaternions to work in the same way as homogeneous matrix multiplication.
 
 For more information on dual quaternions, take a look at the `References`_.
-For conversion from and to common ROS messages, see dual_quaternions_ros_.
-.. _dual_quaternions_ros: https://github.com/Achllle/dual_quaternions_ros
+For conversion from and to common ROS messages, see `dual_quaternions_ros <https://github.com/Achllle/dual_quaternions_ros>`__.
 
 .. image:: viz.gif
     :scale: 50 %

@@ -138,8 +138,8 @@ class TestDualQuaternion(TestCase):
 
     def test_str_repr_is_string(self):
         # test that __str__ and __repr__ are working
-        self.assertTrue(isinstance(repr(self.identity_dq), basestring))
-        self.assertTrue(isinstance(self.identity_dq.__str__(), basestring))
+        self.assertTrue(isinstance(repr(self.identity_dq), str))
+        self.assertTrue(isinstance(self.identity_dq.__str__(), str))
 
     def test_quaternion_conjugate(self):
         dq = self.normalized_dq * self.normalized_dq.quaternion_conjugate()

@@ -1,11 +1,11 @@
-from setuptools import setup
+from distutils.core import setup
 
 def readme():
     with open('README.rst') as f:
         return f.read()
 
 setup(name='dual_quaternions',
-      version='0.3.1',
+      version='0.3.2',
       description='Dual quaternion implementation',
       long_description=readme(),
       url='http://github.com/Achllle/dual_quaternions',

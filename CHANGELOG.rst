@@ -2,8 +2,8 @@
 Changelog for package dual_quaternions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.3.2 (2020-06-12)
+------------------
 * Use distutils iso setuptools for running on buildfarm
 * Contributors: Achille
 

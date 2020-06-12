@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>dual_quaternions</name>
-  <version>0.3.1</version>
+  <version>0.3.2</version>
   <description>dual quaternion operations</description>
 
   <maintainer email="achille.verheye@gmail.com">achille</maintainer>

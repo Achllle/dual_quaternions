@@ -263,6 +263,18 @@ class DualQuaternion(object):
         return DualQuaternion(q_r, q_d)
 
     @classmethod
+    def exp(cls, q):
+        """Dual Quaternion Exponential
+
+        Find the exponential of a dual quaternion.
+
+        :param q: The input dual quaternion as a DualQuaternion instance.
+        """
+        q_r = Quaternion.exp(q.q_r)
+        q_d = q.q_d * q_r
+        return DualQuaternion(q_r, q_d)
+
+    @classmethod
     def sclerp(cls, start, stop, t):
         """Screw Linear Interpolation
 

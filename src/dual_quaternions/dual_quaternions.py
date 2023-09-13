@@ -222,12 +222,17 @@ class DualQuaternion(object):
         return DualQuaternion(q_r_inv, -q_r_inv * self.q_d * q_r_inv)
 
     def is_normalized(self):
-        """Check if the dual quaternion is normalized"""
-        if np.isclose(self.q_r.norm, 0):
-            return True
-        rot_normalized = np.isclose(self.q_r.norm, 1)
-        trans_normalized = (self.q_d / self.q_r.norm) == self.q_d
-        return rot_normalized and trans_normalized
+        """
+        Check if the dual quaternion is normalized, aka 'unit'
+        
+        Since a rigid body transformation requires 6 parameters and a DQ has 8, there are two constraints
+        to achieve a uniq dual quaternion, from 
+        ||dq|| = 1 := sqrt(dq*dq.quaternion_conjugate())  # raise both sides to power 2 to drop sqrt
+                   = q_r *q_r.conjugate + eps * (q_r * q_d.conjugate + q_d * q_r.conjugate)
+                   = 1 + eps * 0
+        """
+        return np.isclose(self.q_r.norm, 0) and \
+               all(np.isclose(self.q_r * self.q_d.conjugate + self.q_d * self.q_r.conjugate), [0,]*4)
 
     def normalize(self):
         """
@@ -238,6 +243,19 @@ class DualQuaternion(object):
         normalized = self.normalized()
         self.q_r = normalized.q_r
         self.q_d = normalized.q_d
+
+    def normalized(self):
+        """
+        Return a copy of the normalized dual quaternion
+        
+        ||dq|| = sqrt(dq*dq.quaternion_conjugate())  # assuming dq = r + eps*d
+               = sqrt(r^2 - d^2*eps^2)
+               = sqrt(r^2)
+               = |r|
+        which is the absolute value, or the norm since it's a vector
+        """
+        norm_qr = self.q_r.norm
+        return DualQuaternion(self.q_r/norm_qr, self.q_d/norm_qr)
 
     def pow(self, exponent):
         """self^exponent
@@ -339,11 +357,6 @@ class DualQuaternion(object):
         mult = (2.0 * self.q_d) * self.q_r.conjugate
 
         return [mult.x, mult.y, mult.z]
-
-    def normalized(self):
-        """Return a copy of the normalized dual quaternion"""
-        norm_qr = self.q_r.norm
-        return DualQuaternion(self.q_r/norm_qr, self.q_d/norm_qr)
 
     def as_dict(self):
         """dictionary containing the dual quaternion"""

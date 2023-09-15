@@ -365,7 +365,7 @@ class TestDualQuaternion(TestCase):
 
     def test_exp(self):
         """Validate exponential yields a unit dual quaternion"""
-        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1]).normalized()
+        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1])
         exp = DualQuaternion.exp(pure_dq)
         self.assertTrue(exp.is_normalized())
 
@@ -378,7 +378,7 @@ class TestDualQuaternion(TestCase):
     def test_exp_log_identity(self):
         """Taking exp and then log and vice versa should yield original result"""
         self.assertEqual(DualQuaternion.exp(self.normalized_dq.log()), self.normalized_dq)
-        pure_dq = DualQuaternion.from_dq_array(0, 1, 2, 3, 0, 2, -1, 1).normalized()
+        pure_dq = DualQuaternion.from_dq_array(0, 1, 2, 3, 0, 2, -1, 1)
         self.assertEqual(DualQuaternion.exp(pure_dq).log(), pure_dq)
 
     def test_pow(self):

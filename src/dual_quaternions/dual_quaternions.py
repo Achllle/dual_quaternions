@@ -36,7 +36,7 @@ class DualQuaternion(object):
             raise ValueError("q_r and q_d must be of type pyquaternion.Quaternion. Instead received: {} and {}".format(
                 type(q_r), type(q_d)))
         if normalize:
-            self.q_d = q_d / q_r.norm()
+            self.q_d = q_d / q_r.norm
             self.q_r = q_r.normalised
         else:
             self.q_r = q_r

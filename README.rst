@@ -59,6 +59,15 @@ Import using::
 
     from dual_quaternions import DualQuaternion
 
+Comparison with other libraries
+-------------------------------
+
+Many libraries focus on efficiency and are written in C++, sometimes with Python bindings. They typically do not include tests and so it's hard to know whether they're accurate. Along with a test suite, this library aims to explain the various functions and why they're implemented that way. As a result it serves as a starting point for those trying to get started with dual quaternions.
+
+* [Hasenpfote/dualquat](https://github.com/Hasenpfote/dualquat): C++, header-only using Eigen
+* [neka-nat/dq3d](https://github.com/neka-nat/dq3d): C++ based, using Eigen, with Python bindings including examples for ScLERP and skinning
+* [dqrobotics](https://dqrobotics.github.io/): Matlab, C++11 with Python3 bindings, includes docstrings
+
 References
 ----------
 

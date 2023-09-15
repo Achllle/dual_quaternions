@@ -279,18 +279,52 @@ class DualQuaternion(object):
                          vector=exponent*d/2 * np.cos(exponent*theta/2) * s0 + np.sin(exponent*theta/2) * se)
 
         return DualQuaternion(q_r, q_d)
-
+    
     @classmethod
-    def exp(cls, q):
-        """Dual Quaternion Exponential
-
-        Find the exponential of a dual quaternion.
-
-        :param q: The input dual quaternion as a DualQuaternion instance.
+    def exp(cls, dq):
         """
-        q_r = Quaternion.exp(q.q_r)
-        q_d = q.q_d * q_r
-        return DualQuaternion(q_r, q_d)
+        Exponential of a pure dual quaternion (real elements zero) at the identity.
+
+        The manifold of unit dual quaternions which are isomorphic to SE(3) is a Lie group. A Lie group can be viewed as a differentiable Riemannian manifold. 
+        The Lie algebra to this group is the tangent space at the identity, yielding a linearization at the identity.
+        
+        The exponential map is a map from the tangent space at some point x on the manifold to the Lie group. It maps a vector s such that the geodesic
+        through x is followed.
+        At the identity, exp_1(s) =: exp(s) where s is a pure dual quaternion (real part of q_r  and q_d are zero)
+        At some point x, using parallel transport the map becomes exp_x(s) = x * exp_1(x^-1 * s)
+        Intuitively, because exp is only defined at the identity but we're trying to find the map at some other point x, we first move it to the origin
+        by premultiplying with x^-1. Then we map it to the manifold/Lie group using the exponential map, and finally move it back to x by premultiplying
+        by x.
+
+        The exponential map can be derived from the Taylor series of a dual quaternion at dq.q_r which is exact since any higher order terms cancel out given eps^2 = 0
+        f(dq) = f(dq.q_r) + eps * f'(dq.q_r) * dq.q_d
+        Now simply swap f with exp, with exp'(x) = exp(x)
+
+        :param dq: input pute DualQuaternion (Re(dq) = 0, where Re indicates the 'real' parts of the dq (dq.q_r.w and dq.q_d.w))
+        """
+        # check if pure dual quaternion
+        assert np.isclose(dq.q_r.w, 0) and np.isclose(dq.q_d.w, 0)
+
+        exp_q_r = Quaternion.exp(dq.q_r)
+        return DualQuaternion(exp_q_r, dq.q_d * exp_q_r)
+    
+    def log(self):
+        """
+        Logarithm of a unit dual quaternion
+
+        The log of a dual quaternion forms a mapping from the dual quaternion manifold to the tangent space at the identity. See also the exp function.
+
+        The log is just the inverse of the exp mapping, so the same derivation is used. Every unit dual quaternion can be written:
+        dq = cos(theta) + s*sin(theta/2)
+        where theta = theta_r + eps*theta_d (a dual number) and s = s_r + eps*s_d (a unit dual vector)
+
+        log(dq) = s*theta/2
+
+        Daniliidis 1999 shows that we can extract s and theta using the screw parameters (l, m, theta, d) where
+        s = l + eps*m and theta = theta + eps*d
+        """
+        l, m, theta, d = self.screw()
+        return DualQuaternion.from_dq_array([theta, *l, d, *m])
 
     @classmethod
     def sclerp(cls, start, stop, t):
@@ -374,57 +408,6 @@ class DualQuaternion(object):
         """dictionary containing the dual quaternion"""
         return {'r_w': self.q_r.w, 'r_x': self.q_r.x, 'r_y': self.q_r.y, 'r_z': self.q_r.z,
                 'd_w': self.q_d.w, 'd_x': self.q_d.x, 'd_y': self.q_d.y, 'd_z': self.q_d.z}
-
-    @classmethod
-    def exp(cls, dq):
-        """
-        Exponential of a pure dual quaternion (real elements zero) at the identity.
-
-        The manifold of unit dual quaternions which are isomorphic to SE(3) is a Lie group. A Lie group can be viewed as a differentiable Riemannian manifold. 
-        The Lie algebra to this group is the tangent space at the identity, yielding a linearization at the identity.
-        
-        The exponential map is a map from the tangent space at some point x on the manifold to the Lie group. It maps a vector s such that the geodesic
-        through x is followed.
-        At the identity, exp_1(s) =: exp(s) where s is a pure dual quaternion (real part of q_r  and q_d are zero)
-        At some point x, using parallel transport the map becomes exp_x(s) = x * exp_1(x^-1 * s)
-        Intuitively, because exp is only defined at the identity but we're trying to find the map at some other point x, we first move it to the origin
-        by premultiplying with x^-1. Then we map it to the manifold/Lie group using the exponential map, and finally move it back to x by premultiplying
-        by x.
-
-        Using the Taylor series expansion, very similar to quaternions, Euler's identity for dual quaternions is found as:
-        exp(s*theta/2) = cos(theta/2) + s*sin(theta/2) 
-        where theta = theta_r + eps*theta_d (a dual number) and s = s_r + eps*s_d (a unit dual vector)
-        """
-        # check if pure dual quaternion
-        assert np.isclose(dq.q_r.w, 0) and np.isclose(dq.q_d.w, 0)
-
-        half_theta_r = dq.q_r.norm
-        half_theta_d = dq.q_d.norm
-        s_r = dq.q_r / half_theta_r
-        s_d = dq.q_d / half_theta_d
-
-        q_r_vec = np.sin(half_theta_r) * s_r
-        q_d_vec = np.sin(half_theta_d) * s_d
-
-        return cls.from_dq_array([np.cos(half_theta_r), q_r_vec.x, q_r_vec.y, q_r_vec.z, np.cos(half_theta_d), q_d_vec.x, q_d_vec.y, q_d_vec.z])
-    
-    def log(self):
-        """
-        Logarithm of a unit dual quaternion
-
-        The log of a dual quaternion forms a mapping from the dual quaternion manifold to the tangent space at the identity. See also the exp function.
-
-        The log is just the inverse of the exp mapping, so the same derivation is used. Every unit dual quaternion can be written:
-        dq = cos(theta) + s*sin(theta/2)
-        where theta = theta_r + eps*theta_d (a dual number) and s = s_r + eps*s_d (a unit dual vector)
-
-        log(dq) = s*theta/2
-
-        Daniliidis 1999 shows that we can extract s and theta using the screw parameters (l, m, theta, d) where
-        s = l + eps*m and theta = theta + eps*d
-        """
-        l, m, theta, d = self.screw()
-        return DualQuaternion.from_dq_array([theta, *l, d, *m])
 
     def screw(self):
         """

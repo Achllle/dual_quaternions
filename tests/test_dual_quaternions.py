@@ -1,5 +1,5 @@
 import os
-from unittest import TestCase
+from unittest import TestCase, main
 from dual_quaternions import DualQuaternion
 import numpy as np
 from pyquaternion import Quaternion
@@ -363,6 +363,24 @@ class TestDualQuaternion(TestCase):
             interpolated_dq_screw = DualQuaternion.from_screw(l, m, tau*theta, tau*d)
             self.assertEqual(interpolated_dq, interpolated_dq_screw)
 
+    def test_exp(self):
+        """Validate exponential yields a unit dual quaternion"""
+        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1]).normalized()
+        exp = DualQuaternion.exp(pure_dq)
+        self.assertTrue(exp.is_normalized())
+
+    def test_log(self):
+        """Validate logarithm yields a pure dual quaternion"""
+        log = self.normalized_dq.log()
+        self.assertEqual(log.q_r.w, 0)
+        self.assertEqual(log.q_d.w, 0)
+
+    def test_exp_log_identity(self):
+        """Taking exp and then log and vice versa should yield original result"""
+        self.assertEqual(DualQuaternion.exp(self.normalized_dq.log()), self.normalized_dq)
+        pure_dq = DualQuaternion.from_dq_array(0, 1, 2, 3, 0, 2, -1, 1).normalized()
+        self.assertEqual(DualQuaternion.exp(pure_dq).log(), pure_dq)
+
     def test_pow(self):
         expected_result = self.normalized_dq * self.normalized_dq
         received_result = self.normalized_dq.pow(2)
@@ -371,3 +389,14 @@ class TestDualQuaternion(TestCase):
         expected_result = self.random_dq * self.random_dq
         received_result = self.random_dq.pow(2)
         self.assertEqual(received_result, expected_result)
+
+    def test_pow_exp_log(self):
+        """Use exp and log to calculate pow, compare with pow implementation"""
+        for power in [1,2,3]:
+            pow = self.normalized_dq.pow(power)
+            exp_log_pow = DualQuaternion.exp(power*self.normalized_dq.log())
+            self.assertEqual(pow, exp_log_pow)
+
+
+if __name__ == '__main__':
+    main()

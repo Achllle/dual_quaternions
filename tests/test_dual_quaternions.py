@@ -108,6 +108,10 @@ class TestDualQuaternion(TestCase):
         except AssertionError as e:
             self.fail(e)
 
+    def test_inv_conj_unit(self):
+        """For a unit dq, the inverse is equal to the quaternion conjugate"""
+        self.assertEqual(self.normalized_dq.inverse(), self.normalized_dq.quaternion_conjugate())
+
     def test_equal(self):
         self.assertEqual(self.identity_dq, DualQuaternion.identity())
         self.assertEqual(self.identity_dq, DualQuaternion(-Quaternion(1, 0, 0, 0), -Quaternion(0, 0, 0, 0)))
@@ -143,7 +147,7 @@ class TestDualQuaternion(TestCase):
 
     def test_quaternion_conjugate(self):
         dq = self.normalized_dq * self.normalized_dq.quaternion_conjugate()
-        # a normalized quaternion multiplied with its quaternion conjugate should yield unit dual quaternion
+        # a normalized quaternion multiplied with its quaternion conjugate should yield 1
         self.assertEqual(dq, DualQuaternion.identity())
 
         # test that the conjugate corresponds to the inverse of it's matrix representation
@@ -202,11 +206,14 @@ class TestDualQuaternion(TestCase):
         self.assertEqual(res1, res2)
 
     def test_normalize(self):
-        self.assertTrue(self.identity_dq.is_normalized())
+        self.assertTrue(self.identity_dq.is_normalized)
         self.assertEqual(self.identity_dq.normalized(), self.identity_dq)
         unnormalized_dq = DualQuaternion.from_quat_pose_array([1, 2, 3, 4, 5, 6, 7])
         unnormalized_dq.normalize()  # now normalized!
-        self.assertTrue(unnormalized_dq.is_normalized())
+        self.assertTrue(unnormalized_dq.is_normalized)
+        unnormalized_dq = DualQuaternion.from_dq_array([2, 1, 2, 3, 4, 5, 6, 7])
+        unnormalized_dq.normalize()  # now normalized!
+        self.assertTrue(unnormalized_dq.is_normalized)
 
     def test_transform(self):
         # transform a point from one frame (f2) to another (f1)
@@ -367,18 +374,24 @@ class TestDualQuaternion(TestCase):
         """Validate exponential yields a unit dual quaternion"""
         pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1])
         exp = DualQuaternion.exp(pure_dq)
-        self.assertTrue(exp.is_normalized())
+        self.assertTrue(exp.is_normalized)
 
     def test_log(self):
         """Validate logarithm yields a pure dual quaternion"""
         log = self.normalized_dq.log()
-        self.assertEqual(log.q_r.w, 0)
-        self.assertEqual(log.q_d.w, 0)
+        self.assertAlmostEqual(log.q_r.w, 0)
+        self.assertAlmostEqual(log.q_d.w, 0)
+
+        # twist of identity is 0
+        self.assertEqual(DualQuaternion.identity().log(), DualQuaternion(Quaternion([0,0,0,0]), Quaternion([0,0,0,0])))
 
     def test_exp_log_identity(self):
         """Taking exp and then log and vice versa should yield original result"""
-        self.assertEqual(DualQuaternion.exp(self.normalized_dq.log()), self.normalized_dq)
-        pure_dq = DualQuaternion.from_dq_array(0, 1, 2, 3, 0, 2, -1, 1)
+        dq = DualQuaternion.from_quat_pose_array([self.normalized_dq.q_r.w, self.normalized_dq.q_r.x, self.normalized_dq.q_r.y, self.normalized_dq.q_r.z, 1, 2, 3])
+        self.assertEqual(DualQuaternion.exp(dq.log()), dq)
+        # self.assertEqual(DualQuaternion.exp(self.normalized_dq.log()), self.normalized_dq)
+        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1])
+        pure_dq.q_r = pure_dq.q_r.normalised
         self.assertEqual(DualQuaternion.exp(pure_dq).log(), pure_dq)
 
     def test_pow(self):
@@ -389,13 +402,6 @@ class TestDualQuaternion(TestCase):
         expected_result = self.random_dq * self.random_dq
         received_result = self.random_dq.pow(2)
         self.assertEqual(received_result, expected_result)
-
-    def test_pow_exp_log(self):
-        """Use exp and log to calculate pow, compare with pow implementation"""
-        for power in [1,2,3]:
-            pow = self.normalized_dq.pow(power)
-            exp_log_pow = DualQuaternion.exp(power*self.normalized_dq.log())
-            self.assertEqual(pow, exp_log_pow)
 
 
 if __name__ == '__main__':

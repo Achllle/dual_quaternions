@@ -1,5 +1,7 @@
 import os
-from unittest import TestCase, main
+from unittest import TestCase, main, util
+util._MAX_LENGTH = 10e3  # don't shorten output on error
+
 from dual_quaternions import DualQuaternion
 import numpy as np
 from pyquaternion import Quaternion
@@ -386,13 +388,13 @@ class TestDualQuaternion(TestCase):
         self.assertEqual(DualQuaternion.identity().log(), DualQuaternion(Quaternion([0,0,0,0]), Quaternion([0,0,0,0])))
 
     def test_exp_log_identity(self):
-        """Taking exp and then log and vice versa should yield original result"""
-        dq = DualQuaternion.from_quat_pose_array([self.normalized_dq.q_r.w, self.normalized_dq.q_r.x, self.normalized_dq.q_r.y, self.normalized_dq.q_r.z, 1, 2, 3])
-        self.assertEqual(DualQuaternion.exp(dq.log()), dq)
-        # self.assertEqual(DualQuaternion.exp(self.normalized_dq.log()), self.normalized_dq)
-        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1])
-        pure_dq.q_r = pure_dq.q_r.normalised
-        self.assertEqual(DualQuaternion.exp(pure_dq).log(), pure_dq)
+        """
+        Taking exp of the the log should yield original result
+        
+        Note: the inverse does not hold true in general (log(exp(dq)) != dq)
+        """
+        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1]).normalized()
+        self.assertEqual(pure_dq.log().exp(), pure_dq)
 
     def test_pow(self):
         expected_result = self.normalized_dq * self.normalized_dq

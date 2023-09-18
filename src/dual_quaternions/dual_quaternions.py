@@ -275,38 +275,48 @@ class DualQuaternion(object):
         
         ||dq|| = sqrt(dq*dq.quaternion_conjugate())  # assuming dq = r + eps*d
 
+        TODO: add derivation
         """
-        norm_qr = self.q_r.norm
-        # dot product
-        norm_qd = (self.q_r.w * self.q_d.w + self.q_r.x * self.q_r.x + self.q_r.y * self.q_r.y + self.q_r.z * self.q_r.z) / norm_qr
-        try:
-            return DualQuaternion(self.q_r/norm_qr, self.q_d/norm_qd)
-        except ZeroDivisionError:
-            return DualQuaternion(self.q_r/norm_qr, self.q_d)
+        normed_qr = self.q_r / self.q_r.norm
+
+        d_q_inv = self.q_d * self.q_r.inverse
+        d_q_inv = Quaternion(0.01, d_q_inv.x, d_q_inv.y, d_q_inv.z)
+
+        return DualQuaternion(normed_qr, d_q_inv * normed_qr)
+
+        # # dot product
+        # norm_qr = self.q_r.norm
+        # norm_qd = (self.q_r.w * self.q_d.w + self.q_r.x * self.q_r.x + self.q_r.y * self.q_r.y + self.q_r.z * self.q_r.z) / norm_qr
+        # try:
+        #     # return DualQuaternion(self.q_r/norm_qr, self.q_d/norm_qd)
+        #     return DualQuaternion(self.q_r/norm_qr, self.q_d/norm_qd)
+        # except ZeroDivisionError:
+        #     # return DualQuaternion(self.q_r/norm_qr, self.q_d)
+        #     return DualQuaternion(self.q_r/norm_qr, self.q_d)
 
     def pow(self, exponent):
         """self^exponent
 
         :param exponent: single float
         """
-        return (exponent * self.log()).exp() 
-        # exponent = float(exponent)
+        # return (exponent * self.log()).exp() 
+        exponent = float(exponent)
 
-        # theta = 2*np.arccos(self.q_r.w)
-        # if np.isclose(theta, 0):
-        #     return DualQuaternion.from_translation_vector(exponent*np.array(self.translation()))
-        # else:
-        #     s0 = self.q_r.vector / np.sin(theta/2)
-        #     d = -2. * self.q_d.w / np.sin(theta / 2)
-        #     se = (self.q_d.vector - s0 * d/2 * np.cos(theta/2)) / np.sin(theta/2)
+        theta = 2*np.arccos(self.q_r.w)
+        if np.isclose(theta, 0):
+            return DualQuaternion.from_translation_vector(exponent*np.array(self.translation()))
+        else:
+            s0 = self.q_r.vector / np.sin(theta/2)
+            d = -2. * self.q_d.w / np.sin(theta / 2)
+            se = (self.q_d.vector - s0 * d/2 * np.cos(theta/2)) / np.sin(theta/2)
 
-        # q_r = Quaternion(scalar=np.cos(exponent*theta/2),
-        #                  vector=np.sin(exponent*theta/2) * s0)
+        q_r = Quaternion(scalar=np.cos(exponent*theta/2),
+                         vector=np.sin(exponent*theta/2) * s0)
 
-        # q_d = Quaternion(scalar=-exponent*d/2 * np.sin(exponent*theta/2),
-        #                  vector=exponent*d/2 * np.cos(exponent*theta/2) * s0 + np.sin(exponent*theta/2) * se)
+        q_d = Quaternion(scalar=-exponent*d/2 * np.sin(exponent*theta/2),
+                         vector=exponent*d/2 * np.cos(exponent*theta/2) * s0 + np.sin(exponent*theta/2) * se)
 
-        # return DualQuaternion(q_r, q_d)
+        return DualQuaternion(q_r, q_d)
     
     def exp(self):
         """

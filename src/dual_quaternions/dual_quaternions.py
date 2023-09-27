@@ -28,7 +28,6 @@ class DualQuaternion(object):
     $ dq = DualQuaternion.from_screw([lx, ly, lz], [mx, my, mz], theta, d)
 
     The underlying representation for a single quaternion uses the format [w x y z]
-    The rotation part (non-dual) will always be normalized.
     """
 
     def __init__(self, q_r, q_d, normalize=False):
@@ -36,7 +35,7 @@ class DualQuaternion(object):
             raise ValueError("q_r and q_d must be of type pyquaternion.Quaternion. Instead received: {} and {}".format(
                 type(q_r), type(q_d)))
         if normalize:
-            self.q_d = q_d / q_r.norm()
+            self.q_d = q_d / q_r.norm
             self.q_r = q_r.normalised
         else:
             self.q_r = q_r
@@ -107,18 +106,50 @@ class DualQuaternion(object):
         """
         return DualQuaternion(self.q_r + other.q_r, self.q_d + other.q_d)
 
+    def __sub__(self, other):
+        """
+        Dual Quaternion subtraction.
+        :param other: dual quaternion
+        :return: DualQuaternion(self.q_r - other.q_r, self.q_d - other.q_d)
+        """
+        return DualQuaternion(self.q_r - other.q_r, self.q_d - other.q_d)
+
     def __eq__(self, other):
         return (self.q_r == other.q_r or self.q_r == -other.q_r) \
                and (self.q_d == other.q_d or self.q_d == -other.q_d)
 
     def __ne__(self, other):
         return not self == other
+    
+    def __abs__(self):
+        """
+        Dual Quaternion absolute value, equals the norm
+        
+        :return: DualQuaternion
+        """
+        return (self*self.quaternion_conjugate()).sqrt()
+    
+    # @classmethod
+    def sqrt(self):
+        """
+        Square root of a dual quaternion.
+
+        Derivation from Kavan 2008: 
+        Let c + eps*d = sqrt(a + eps*b)
+        -> (c + eps*d)^2 = a + eps*b
+        -> c^2 + eps*2*c*d = a + eps*b
+        -> c = sqrt(a); d = b/(2*sqrt(a))
+
+        provided a > 0
+        """
+        sqrt_q_r = self.q_r**0.5
+        return DualQuaternion(sqrt_q_r, self.q_d/(2*sqrt_q_r))
 
     def transform_point(self, point_xyz):
         """
         Convenience function to apply the transformation to a given vector.
         dual quaternion way of applying a rotation and translation using matrices Rv + t or H[v; 1]
-        This works out to be: sigma @ (1 + ev) @ sigma.combined_conjugate()
+        This works out to be: sigma @ (1 + ev) @ sigma.combined_conjugate() assuming self is unit
 
         If we write self = p + eq, this can be expanded to 1 + eps(rvr* + t)
         with r = p and t = 2qp* which should remind you of Rv + t and the quaternion
@@ -128,11 +159,24 @@ class DualQuaternion(object):
         :param point_xyz: list or np.array in order: [x y z]
         :return: vector of length 3
         """
+        assert self.is_normalized
         dq_point = DualQuaternion.from_dq_array([1, 0, 0, 0,
                                                  0, point_xyz[0], point_xyz[1], point_xyz[2]])
         res_dq = self * dq_point * self.combined_conjugate()
         
         return res_dq.dq_array()[5:]
+
+    # def adjoint(self, dq: DualQuaternion):
+    #     """
+    #     Adjoint transformation: adj(q, v) = q @ v @ q*
+        
+    #     q (self) must be unit.
+
+    #     :param dq: pure dual quaternion (i.e. only imaginary parts / vector dual quaternion)
+    #     """
+    #     return self * dq * self.combin
+
+
 
     @classmethod
     def from_dq_array(cls, r_wxyz_t_wxyz):
@@ -187,7 +231,7 @@ class DualQuaternion(object):
         """
         Return the individual quaternion conjugates (qr, qd)* = (qr*, qd*)
 
-        This is equivalent to inverse of a homogeneous matrix. It is used in applying
+        This is equivalent to inverse of a homogeneous matrix when the dq is unit. It is used in applying
         a transformation to a line expressed in Plucker coordinates.
         See also DualQuaternion.dual_conjugate() and DualQuaternion.combined_conjugate().
         """
@@ -216,11 +260,22 @@ class DualQuaternion(object):
         """
         Return the dual quaternion inverse
 
+        From Daniliidis 1999: "if the norm has a nonvanishing real part, then the dual quaternion has an inverse q^-1 = ||q||^-1 * q*"
+        where q* = q.quaternion_conjugate(). This makes an alternative way to compute the inverse.
+
         For unit dual quaternions dq.inverse = dq.quaternion_conjugate()
         """
         q_r_inv = self.q_r.inverse
         return DualQuaternion(q_r_inv, -q_r_inv * self.q_d * q_r_inv)
+    
+    @property
+    def is_pure(self):
+        """
+        Is this a pure dual quaternion, i.e. Re(dq) = 0, where Re indicates the 'real' parts of the dq (dq.q_r.w and dq.q_d.w)
+        """
+        return np.isclose(self.q_r.w, 0) and np.isclose(self.q_d.w, 0)
 
+    @property
     def is_normalized(self):
         """
         Check if the dual quaternion is normalized, aka 'unit'
@@ -228,11 +283,13 @@ class DualQuaternion(object):
         Since a rigid body transformation requires 6 parameters and a DQ has 8, there are two constraints
         to achieve a uniq dual quaternion, from 
         ||dq|| = 1 := sqrt(dq*dq.quaternion_conjugate())  # raise both sides to power 2 to drop sqrt
-                   = q_r *q_r.conjugate + eps * (q_r * q_d.conjugate + q_d * q_r.conjugate)
-                   = 1 + eps * 0
+                   = q_r * q_r.conjugate + eps * (q_r * q_d.conjugate + q_d * q_r.conjugate)
+                   = ||q_r||^2 + 2 * eps * (q_r.w * q_d.w + dot(q_r.vec, q_d.vec))
+        
+        --> ||q_r||^2 = 1
+        and dot(q_r, q_d) = 0
         """
-        return np.isclose(self.q_r.norm, 0) and \
-               all(np.isclose(self.q_r * self.q_d.conjugate + self.q_d * self.q_r.conjugate), [0,]*4)
+        return np.isclose(self.q_r.norm, 1.0) and np.isclose(self.q_r.w * self.q_d.w + np.dot(self.q_r.vector, self.q_d.vector), 0)
 
     def normalize(self):
         """
@@ -249,48 +306,125 @@ class DualQuaternion(object):
         Return a copy of the normalized dual quaternion
         
         ||dq|| = sqrt(dq*dq.quaternion_conjugate())  # assuming dq = r + eps*d
-               = sqrt(r^2 - d^2*eps^2)
-               = sqrt(r^2)
-               = |r|
-        which is the absolute value, or the norm since it's a vector
+        dq / ||dq|| = (r + eps*d) / ||r + eps*d||
+
+        with ||r + eps*d|| = sqrt((r + eps*d) * (r* + eps*d*))
+                           = sqrt(||r||^2 + eps*2*dot(r, d))  # where dot is the Euclidean dot product
+                           = ||r|| + eps*dot(r, d) / ||r||  # to get to this step, use the derivation in the sqrt function
+
+          dq             r + eps*d             ||r|| - eps*dot(r,d)/||r||
+        ------ =  -------------------------- . --------------------------
+        ||dq||    ||r|| + eps*dot(r,d)/||r||   ||r|| - eps*dot(r,d)/||r||
+
+          dq        r       eps         r*dot(r,d)
+        ------ =  ----- +  ----- * (d - ----------)
+        ||dq||    ||r||    ||r||         ||r||^2
         """
         norm_qr = self.q_r.norm
-        return DualQuaternion(self.q_r/norm_qr, self.q_d/norm_qr)
+
+        r_dot_d = self.q_r.w * self.q_d.w + np.dot(self.q_r.vector, self.q_d.vector)
+        dual = self.q_d - self.q_r * r_dot_d / (norm_qr**2)
+        return DualQuaternion(self.q_r / norm_qr, dual / norm_qr)
 
     def pow(self, exponent):
         """self^exponent
 
         :param exponent: single float
         """
-        exponent = float(exponent)
+        return (exponent * self.log()).exp()
+        # exponent = float(exponent)
 
-        theta = 2*np.arccos(self.q_r.w)
-        if np.isclose(theta, 0):
-            return DualQuaternion.from_translation_vector(exponent*np.array(self.translation()))
-        else:
-            s0 = self.q_r.vector / np.sin(theta/2)
-            d = -2. * self.q_d.w / np.sin(theta / 2)
-            se = (self.q_d.vector - s0 * d/2 * np.cos(theta/2)) / np.sin(theta/2)
+        # theta = 2*np.arccos(self.q_r.w)
+        # if np.isclose(theta, 0):
+        #     return DualQuaternion.from_translation_vector(exponent*np.array(self.translation()))
+        # else:
+        #     s0 = self.q_r.vector / np.sin(theta/2)
+        #     d = -2. * self.q_d.w / np.sin(theta / 2)
+        #     se = (self.q_d.vector - s0 * d/2 * np.cos(theta/2)) / np.sin(theta/2)
 
-        q_r = Quaternion(scalar=np.cos(exponent*theta/2),
-                         vector=np.sin(exponent*theta/2) * s0)
+        # q_r = Quaternion(scalar=np.cos(exponent*theta/2),
+        #                  vector=np.sin(exponent*theta/2) * s0)
 
-        q_d = Quaternion(scalar=-exponent*d/2 * np.sin(exponent*theta/2),
-                         vector=exponent*d/2 * np.cos(exponent*theta/2) * s0 + np.sin(exponent*theta/2) * se)
+        # q_d = Quaternion(scalar=-exponent*d/2 * np.sin(exponent*theta/2),
+        #                  vector=exponent*d/2 * np.cos(exponent*theta/2) * s0 + np.sin(exponent*theta/2) * se)
 
-        return DualQuaternion(q_r, q_d)
-
-    @classmethod
-    def exp(cls, q):
-        """Dual Quaternion Exponential
-
-        Find the exponential of a dual quaternion.
-
-        :param q: The input dual quaternion as a DualQuaternion instance.
+        # return DualQuaternion(q_r, q_d)
+    
+    # @classmethod
+    def exp(self):
         """
-        q_r = Quaternion.exp(q.q_r)
-        q_d = q.q_d * q_r
-        return DualQuaternion(q_r, q_d)
+        Exponential of a pure dual quaternion (real elements zero) at the identity.
+
+        The manifold of unit dual quaternions which are isomorphic to SE(3) is a Lie group. A Lie group can be viewed as a differentiable Riemannian manifold. 
+        The Lie algebra to this group is the tangent space at the identity, yielding a linearization at the identity.
+        
+        The exponential map is a map from the tangent space at some point x on the manifold to the Lie group. It maps a vector s such that the geodesic
+        through x is followed.
+        At the identity, exp_1(s) =: exp(s) where s is a pure dual quaternion (real part of q_r  and q_d are zero)
+        At some point x, using parallel transport the map becomes exp_x(s) = x * exp_1(x^-1 * s)
+        Intuitively, because exp is only defined at the identity but we're trying to find the map at some other point x, we first move it to the origin
+        by premultiplying with x^-1. Then we map it to the manifold/Lie group using the exponential map, and finally move it back to x by premultiplying
+        by x.
+
+        The exponential map can be derived from the Taylor series of a dual quaternion at dq.q_r which is exact since any higher order terms cancel out given eps^2 = 0
+        f(dq) = f(dq.q_r) + eps * f'(dq.q_r) * dq.q_d
+        Now simply swap f with exp, with exp'(x) = exp(x)
+
+        :return: unit DualQuaternion
+        """
+        assert self.is_pure
+
+        # comparing with Kavan 2008 using cos and sin
+        qr_norm = self.q_r.norm
+        if qr_norm != 0:
+            div = np.sin(qr_norm)/qr_norm
+            r = Quaternion(np.cos(qr_norm), div*self.q_r.x, div*self.q_r.y, div*self.q_r.z)
+        else:
+            r = Quaternion(1,0,0,0)
+        return DualQuaternion(r, self.q_d * r)
+
+        # Taylor method:
+        # exp_q_r = Quaternion.exp(self.q_r)
+        # return DualQuaternion(exp_q_r, exp_q_r * self.q_d)
+
+    # @classmethod
+    def log(self):
+        """
+        Logarithm of a unit dual quaternion
+
+        The log of a dual quaternion forms a mapping from the dual quaternion manifold to the tangent space at the identity. See also the exp function.
+
+        The log is just the inverse of the exp mapping, so the same derivation is used as in exp, with f'(dq.q_r) = inv(dq.q_r) = conj(dq.q_r) since q_r is a unit quaternion       
+        
+        Every unit dual quaternion can be written:
+        dq = cos(theta) + s*sin(theta/2)
+        where theta = theta_r + eps*theta_d (a dual number) and s = s_r + eps*s_d (a unit dual vector)
+
+        log(dq) = s*theta/2
+
+        Daniliidis 1999 shows that we can extract s and theta using the screw parameters (l, m, theta, d) where
+        s = l + eps*m and theta = theta + eps*d
+
+        :return: pure DualQuaternion
+        """
+        assert self.is_normalized
+
+        # Kavan method:
+        prim = np.arccos(self.q_r.w) * self.q_r / np.sin(np.arccos(self.q_r.w))
+        prim = Quaternion(0, prim.x, prim.y, prim.z)
+        dual = self.q_d * self.q_r.conjugate
+        dual = Quaternion(0, dual.x, dual.y, dual.z)
+        return DualQuaternion(prim, dual)
+
+        # Taylor method:
+        # return DualQuaternion(Quaternion.log(self.q_r), self.q_r.conjugate * self.q_d / self.q_r.norm)
+        
+        # screw method:
+        l, m, theta, d = self.screw()
+        # a = 0.5 * theta * l
+        # b = 0.5 * m
+        # return DualQuaternion.from_dq_array([0, *a, 0, *b])
+        # return DualQuaternion.from_dq_array([theta, *l, d, *m])
 
     @classmethod
     def sclerp(cls, start, stop, t):

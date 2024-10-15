@@ -259,26 +259,29 @@ class DualQuaternion(object):
 
     def pow(self, exponent):
         """self^exponent
-
         :param exponent: single float
         """
         exponent = float(exponent)
-
-        theta = 2*np.arccos(self.q_r.w)
+        theta = self.q_r.angle
+        t = self.translation() # translation of the dual quaternion
         if np.isclose(theta, 0):
-            return DualQuaternion.from_translation_vector(exponent*np.array(self.translation()))
+            return DualQuaternion.from_translation_vector(exponent * np.array(t))
         else:
-            s0 = self.q_r.vector / np.sin(theta/2)
-            d = -2. * self.q_d.w / np.sin(theta / 2)
-            se = (self.q_d.vector - s0 * d/2 * np.cos(theta/2)) / np.sin(theta/2)
-
-        q_r = Quaternion(scalar=np.cos(exponent*theta/2),
-                         vector=np.sin(exponent*theta/2) * s0)
-
-        q_d = Quaternion(scalar=-exponent*d/2 * np.sin(exponent*theta/2),
-                         vector=exponent*d/2 * np.cos(exponent*theta/2) * s0 + np.sin(exponent*theta/2) * se)
-
-        return DualQuaternion(q_r, q_d)
+            # Plucker coordinates
+            theta = theta                         # screw axis angle
+            l = self.q_r.vector / np.sin(theta/2) # screw axis vector
+            d = np.dot(l,t)                       # screw axis translation
+            m = 0.5 * (np.cross(t, l) + np.cross(l, np.cross(t, l)/np.tan(theta/2))) # screw axis moment
+            # Do not compute screw parameters using this three lines 
+            #s0 = self.q_r.vector / np.sin(theta/2) 
+            #d = -2. * self.q_d.w / np.sin(theta/2)
+            #se = (self.q_d.vector - l * d/2 * np.cos(theta/2)) / np.sin(theta/2) # BUG
+            # Create the dual quaternion
+            q_r = Quaternion(scalar=np.cos(exponent*theta/2),
+                             vector=np.sin(exponent*theta/2) * l)
+            q_d = Quaternion(scalar=-exponent*d/2 * np.sin(exponent*theta/2),
+                             vector=exponent*d/2 * np.cos(exponent*theta/2) * l + np.sin(exponent*theta/2) * m)
+            return DualQuaternion(q_r, q_d)
 
     @classmethod
     def exp(cls, q):
@@ -307,9 +310,9 @@ class DualQuaternion(object):
                   screw axis to interpolate
         """
         # ensure we always find closest solution. See Kavan and Zara 2005
-        if (start.q_r * stop.q_r).w < 0:
-            start.q_r *= -1
-        return start * (start.inverse() * stop).pow(t)
+        #if (start.q_r * stop.q_r).w < 0:
+        #    start.q_r *= -1
+        return start * (start.quaternion_conjugate() * stop).pow(t)
 
     def nlerp(self, other, t):
         raise NotImplementedError()

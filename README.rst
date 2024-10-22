@@ -46,7 +46,7 @@ pip
   pip install dual_quaternions
 
 ROS1 package
-~~~~~~~~~~~
+~~~~~~~~~~~~
 
 .. code-block:: bash
 

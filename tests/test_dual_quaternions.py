@@ -1,11 +1,11 @@
 import os
-from unittest import TestCase
+import unittest
 from dual_quaternions import DualQuaternion
 import numpy as np
 from pyquaternion import Quaternion
 
 
-class TestDualQuaternion(TestCase):
+class TestDualQuaternion(unittest.TestCase):
 
     def setUp(self):
         self.identity_dq = DualQuaternion.identity()
@@ -371,3 +371,7 @@ class TestDualQuaternion(TestCase):
         expected_result = self.random_dq * self.random_dq
         received_result = self.random_dq.pow(2)
         self.assertEqual(received_result, expected_result)
+
+
+if __name__ == '__main__':
+    unittest.main()

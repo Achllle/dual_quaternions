@@ -1,13 +1,13 @@
-from distutils.core import setup
+from setuptools import setup
 
-def readme():
-    with open('README.md') as f:
-        return f.read()
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
 
 setup(name='dual_quaternions',
       version='0.3.3',
       description='Dual quaternion implementation',
-      long_description=readme(),
+      long_description=long_description,
       url='http://github.com/Achllle/dual_quaternions',
       author='Achille Verheye',
       author_email='achille.verheye@gmail.com',

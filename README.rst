@@ -1,9 +1,9 @@
 Dual Quaternions
 ================
 
-|travis| |tags|
+|tests_status| |tags|
 
-.. |travis| image:: https://travis-ci.com/Achllle/dual_quaternions.svg?branch=master
+.. |tests_status| image:: https://github.com/Achllle/dual_quaternions/actions/workflows/run_tests.yml/badge.svg
     :target: https://travis-ci.com/Achllle/dual_quaternions
 
 .. |tags| image:: https://img.shields.io/github/v/tag/achllle/dual_quaternions

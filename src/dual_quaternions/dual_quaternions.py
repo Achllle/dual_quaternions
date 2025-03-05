@@ -231,8 +231,8 @@ class DualQuaternion(object):
                    = q_r *q_r.conjugate + eps * (q_r * q_d.conjugate + q_d * q_r.conjugate)
                    = 1 + eps * 0
         """
-        return np.isclose(self.q_r.norm, 0) and \
-               all(np.isclose(self.q_r * self.q_d.conjugate + self.q_d * self.q_r.conjugate), [0,]*4)
+        return np.isclose(self.q_r.norm, 1) and \
+               all(np.isclose(self.q_r * self.q_d.conjugate + self.q_d * self.q_r.conjugate, [0,]*4))
 
     def normalize(self):
         """

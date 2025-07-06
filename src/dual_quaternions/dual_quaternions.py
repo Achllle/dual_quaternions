@@ -187,15 +187,15 @@ class DualQuaternion(object):
         
         return res_dq.dq_array()[5:]
 
-    # def adjoint(self, dq: DualQuaternion):
-    #     """
-    #     Adjoint transformation: adj(q, v) = q @ v @ q*
+    def adjoint(self, dq):
+        """
+        Adjoint transformation: adj(q, v) = q @ v @ q*
         
-    #     q (self) must be unit.
+        q (self) must be unit.
 
-    #     :param dq: pure dual quaternion (i.e. only imaginary parts / vector dual quaternion)
-    #     """
-    #     return self * dq * self.combin
+        :param dq: pure dual quaternion (i.e. only imaginary parts / vector dual quaternion)
+        """
+        return NotImplementedError("Adjoint transformation not implemented yet")
 
     @classmethod
     def from_dq_array(cls, r_wxyz_t_wxyz):
@@ -424,9 +424,12 @@ class DualQuaternion(object):
         :param t: fraction betweem [0, 1] representing how far along and around the
                   screw axis to interpolate
         """
-        # ensure we always find closest solution. See Kavan and Zara 2005
-        #if (start.q_r * stop.q_r).w < 0:
-        #    start.q_r *= -1
+        # Ensure we always find closest solution. See Kavan and Zara 2005
+        # If the quaternion dot product is negative, we should use the opposite representation
+        # to ensure the shortest path on the quaternion manifold
+        if (start.q_r.w * stop.q_r.w + np.dot(start.q_r.vector, stop.q_r.vector)) < 0:
+            stop = DualQuaternion(-stop.q_r, -stop.q_d)
+        
         return start * (start.quaternion_conjugate() * stop).pow(t)
 
     def nlerp(self, other, t):

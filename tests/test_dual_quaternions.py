@@ -417,6 +417,94 @@ class TestDualQuaternion(unittest.TestCase):
         pow12 = self.normalized_dq.pow(0.5)
         self.assertEqual(sqrt, pow12)
 
+    def test_sclerp_shortest_path(self):
+        """Test that ScLERP always chooses the shortest path between two dual quaternions
+        
+        Since dual quaternions have a double cover property (both dq and -dq represent
+        the same transformation), ScLERP should automatically choose the shorter path
+        by ensuring the quaternion dot product is positive.
+        """
+        # Test case 1: 200 degree rotation (should use 160° short path)
+        start_dq = DualQuaternion.identity()
+        
+        angle_200 = 200 * np.pi / 180  # 200 degrees in radians
+        end_rotation = Quaternion(axis=[0, 0, 1], angle=angle_200)
+        end_translation = [1, 0, 0]
+        end_dq = DualQuaternion.from_quat_pose_array([
+            end_rotation.w, end_rotation.x, end_rotation.y, end_rotation.z,
+            *end_translation
+        ])
+        
+        # Test with the original dual quaternion vs negated version
+        midpoint_original = DualQuaternion.sclerp(start_dq, end_dq, 0.5)
+        end_dq_negated = DualQuaternion(-end_dq.q_r, -end_dq.q_d)
+        midpoint_negated = DualQuaternion.sclerp(start_dq, end_dq_negated, 0.5)
+        
+        # Both should represent the same transformation at the endpoints
+        self.assertEqual(end_dq, end_dq_negated)
+        
+        # The implementation should automatically choose the positive dot product path
+        # So both interpolations should yield similar results (both taking the shorter path)
+        _, _, theta_mid_original, _ = midpoint_original.screw()
+        _, _, theta_mid_negated, _ = midpoint_negated.screw()
+        
+        self.assertAlmostEqual(abs(theta_mid_original), abs(theta_mid_negated), places=2)
+        
+        # The midpoint angle should be around 80° (half of 160° short path)
+        # rather than 100° (half of 200° long path)
+        expected_short_path_mid = (360 - 200) * np.pi / 180 / 2  # 80 degrees
+        actual_mid = abs(theta_mid_original)
+        
+        # Should be closer to 80° than to 100°
+        self.assertLess(abs(actual_mid - expected_short_path_mid), 
+                       abs(actual_mid - angle_200/2))
+        
+        # Test case 2: 270 degree rotation (should use 90° short path)
+        large_angle = 270 * np.pi / 180  # 270 degrees
+        large_rotation = Quaternion(axis=[0, 1, 0], angle=large_angle)
+        large_dq = DualQuaternion.from_quat_pose_array([
+            large_rotation.w, large_rotation.x, large_rotation.y, large_rotation.z,
+            0, 1, 0  # Translation along Y
+        ])
+        
+        midpoint_large = DualQuaternion.sclerp(start_dq, large_dq, 0.5)
+        midpoint_large_neg = DualQuaternion.sclerp(start_dq, 
+                                                   DualQuaternion(-large_dq.q_r, -large_dq.q_d), 
+                                                   0.5)
+        
+        # Both should take the same short path
+        _, _, theta_large_mid, _ = midpoint_large.screw()
+        _, _, theta_large_mid_neg, _ = midpoint_large_neg.screw()
+        
+        self.assertAlmostEqual(abs(theta_large_mid), abs(theta_large_mid_neg), places=2)
+        
+        # The midpoint should be around 45° (half of 90° short path)
+        expected_short_mid = np.pi / 4  # 45 degrees
+        self.assertLess(abs(theta_large_mid), np.pi/2)  # Should be less than 90°
+        self.assertAlmostEqual(abs(theta_large_mid), expected_short_mid, places=1)
+        
+        # Test case 3: Rotation that exceeds 180° (181°, should use 179° short path)
+        critical_angle = 181 * np.pi / 180  # 181 degrees
+        critical_rotation = Quaternion(axis=[1, 0, 0], angle=critical_angle)
+        critical_dq = DualQuaternion.from_quat_pose_array([
+            critical_rotation.w, critical_rotation.x, critical_rotation.y, critical_rotation.z,
+            0, 0, 1  # Translation along Z
+        ])
+        
+        dot_critical = start_dq.q_r.w * critical_dq.q_r.w + np.dot(start_dq.q_r.vector, critical_dq.q_r.vector)
+        
+        # At 181°, the dot product should be negative (indicating long path)
+        self.assertLess(dot_critical, 0)
+        
+        # ScLERP should automatically use the short path
+        midpoint_critical = DualQuaternion.sclerp(start_dq, critical_dq, 0.5)
+        _, _, theta_critical_mid, _ = midpoint_critical.screw()
+        
+        # Should be around 89.5° (half of 179° short path), not ~90.5° (half of 181°)
+        expected_short_mid = (360 - 181) * np.pi / 180 / 2  # Half of the 179° short path
+        self.assertLess(abs(theta_critical_mid), np.pi/2)  # Should be less than 90°
+        self.assertAlmostEqual(abs(theta_critical_mid), expected_short_mid, places=1)
+
 
 if __name__ == '__main__':
     unittest.main()

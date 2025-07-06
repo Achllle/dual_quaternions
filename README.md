@@ -37,3 +37,29 @@ from dual_quaternions import DualQuaternion
 * Kavan, Ladislav & Collins, Steven & Zara, Jiri & O'Sullivan, Carol. (2007). Skinning with dual quaternions. I3D. 39-46. 10.1145/1230100.1230107.
 * Kenwright, B. (2012). A Beginners Guide to Dual-Quaternions What They Are, How They Work, and How to Use Them for 3D Character Hierarchies.
 * Furrer, Fadri & Fehr, Marius & Novkovic, Tonci & Sommer, Hannes & Gilitschenski, Igor & Siegwart, Roland. (2018). Evaluation of Combined Time-Offset Estimation and Hand-Eye Calibration on Robotic Datasets. 145-159. 10.1007/978-3-319-67361-5_10.
+
+## Derivations
+
+### log and exp
+
+The exponential map is a map from the tangent space at some point x on the manifold onto its Lie group. It maps a vector $s$ such that the geodesic through $x$ is followed.
+At the identity, $exp_1(s) =: exp(s)$ where $s$ is a pure dual quaternion (real part of $q_r$ and $q_d$ are zero)
+At some point $x$, using parallel transport the map becomes $\exp_x(s) = x \cdot \exp_1(x^{-1} \cdot s)$
+Intuitively, because $\exp$ is only defined at the identity but we're trying to find the map at some other point $x$, we first move it to the origin by premultiplying with $x^{-1}$. Then we map it to the manifold/Lie group using the exponential map, and finally move it back to $x$ by premultiplying by $x$.
+
+* exp: $\mathfrak{se}(3) \rightarrow SE(3)$
+  * takes elements from the Lie algebra to the manifold
+* log: $SE(3) \rightarrow \mathfrak{se}(3)$
+  * takes elements from the manifold to the Lie Algebra
+
+In some sources log and exp are derived using the Taylor method first order approximation $f(a+\epsilon b) \~= f(a)+\epsilon b f'(a)$
+Applying this to the log and exp functions, you would get:
+
+```math
+exp(r+\epsilon d) = exp(r)+\epsilon \cdot exp(r) \cdot d \\
+log(r+\epsilon d) = log(r)+\epsilon \cdot r^{-1}\cdot d
+```
+
+where $r^{-1}=r^*$ since $r$ is unit.
+This only gives the same answer as the Lie algebra formulation when the dual part is symmetric with respect to the real part, i.e. $d \cdot r^* = r^* \cdot d$
+For nontrivial rotation and translation not aligned with the rotation axis, this is not the case. This is because the Taylor approximation assumes commutativity, which dual quaternion multiplication is not. As a result, the Taylor method can produce non-symmetric, non-pure dual quaternions which is not 'correct'.

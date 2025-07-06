@@ -1,9 +1,8 @@
 import os
 import unittest
+from pyquaternion import Quaternion
 from dual_quaternions import DualQuaternion
 import numpy as np
-from pyquaternion import Quaternion
-
 
 class TestDualQuaternion(unittest.TestCase):
 

@@ -328,7 +328,6 @@ class DualQuaternion(object):
 
     def pow(self, exponent):
         """self^exponent
-
         :param exponent: single float
         """
         return (exponent * self.log()).exp()
@@ -441,9 +440,9 @@ class DualQuaternion(object):
                   screw axis to interpolate
         """
         # ensure we always find closest solution. See Kavan and Zara 2005
-        if (start.q_r * stop.q_r).w < 0:
-            start.q_r *= -1
-        return start * (start.inverse() * stop).pow(t)
+        #if (start.q_r * stop.q_r).w < 0:
+        #    start.q_r *= -1
+        return start * (start.quaternion_conjugate() * stop).pow(t)
 
     def nlerp(self, other, t):
         raise NotImplementedError()

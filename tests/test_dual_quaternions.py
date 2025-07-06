@@ -1,9 +1,8 @@
 import os
 import unittest
+from pyquaternion import Quaternion
 from dual_quaternions import DualQuaternion
 import numpy as np
-from pyquaternion import Quaternion
-
 
 class TestDualQuaternion(unittest.TestCase):
 
@@ -108,6 +107,10 @@ class TestDualQuaternion(unittest.TestCase):
         except AssertionError as e:
             self.fail(e)
 
+    def test_inv_conj_unit(self):
+        """For a unit dq, the inverse is equal to the quaternion conjugate"""
+        self.assertEqual(self.normalized_dq.inverse(), self.normalized_dq.quaternion_conjugate())
+
     def test_equal(self):
         self.assertEqual(self.identity_dq, DualQuaternion.identity())
         self.assertEqual(self.identity_dq, DualQuaternion(-Quaternion(1, 0, 0, 0), -Quaternion(0, 0, 0, 0)))
@@ -143,7 +146,7 @@ class TestDualQuaternion(unittest.TestCase):
 
     def test_quaternion_conjugate(self):
         dq = self.normalized_dq * self.normalized_dq.quaternion_conjugate()
-        # a normalized quaternion multiplied with its quaternion conjugate should yield unit dual quaternion
+        # a normalized quaternion multiplied with its quaternion conjugate should yield 1
         self.assertEqual(dq, DualQuaternion.identity())
 
         # test that the conjugate corresponds to the inverse of it's matrix representation
@@ -202,11 +205,18 @@ class TestDualQuaternion(unittest.TestCase):
         self.assertEqual(res1, res2)
 
     def test_normalize(self):
-        self.assertTrue(self.identity_dq.is_normalized())
+        self.assertTrue(self.identity_dq.is_normalized)
         self.assertEqual(self.identity_dq.normalized(), self.identity_dq)
         unnormalized_dq = DualQuaternion.from_quat_pose_array([1, 2, 3, 4, 5, 6, 7])
+        manual_normalized = unnormalized_dq / abs(unnormalized_dq)
         unnormalized_dq.normalize()  # now normalized!
-        self.assertTrue(unnormalized_dq.is_normalized())
+        self.assertTrue(unnormalized_dq.is_normalized)
+        self.assertEqual(unnormalized_dq, manual_normalized)
+        unnormalized_dq = DualQuaternion.from_dq_array([2, 1, 2, 3, 4, 5, 6, 7])
+        manual_normalized = unnormalized_dq / abs(unnormalized_dq)
+        unnormalized_dq.normalize()  # now normalized!
+        self.assertTrue(unnormalized_dq.is_normalized)
+        self.assertEqual(unnormalized_dq, manual_normalized)
 
     def test_transform(self):
         # transform a point from one frame (f2) to another (f1)
@@ -363,14 +373,137 @@ class TestDualQuaternion(unittest.TestCase):
             interpolated_dq_screw = DualQuaternion.from_screw(l, m, tau*theta, tau*d)
             self.assertEqual(interpolated_dq, interpolated_dq_screw)
 
+    def test_exp_unit(self):
+        """Validate exponential yields a unit dual quaternion"""
+        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1])
+        exp = pure_dq.exp()
+        self.assertTrue(exp.is_normalized)
+
+    def test_exp_translation(self):
+        """Exp mapping from a vector with translation component only results in a DQ with real part = 1"""
+        translation = DualQuaternion.from_dq_array([0, 0, 0, 0, 0, 1, 2, 3])
+        exp = translation.exp()
+        self.assertEqual(exp.q_r, Quaternion(1,0,0,0))
+
+    def test_log_pure(self):
+        """Validate logarithm yields a pure dual quaternion"""
+        log = self.normalized_dq.log()
+        self.assertAlmostEqual(log.q_r.w, 0)
+        self.assertAlmostEqual(log.q_d.w, 0)
+
+        # twist of identity is 0
+        self.assertEqual(DualQuaternion.identity().log(), DualQuaternion(Quaternion([0,0,0,0]), Quaternion([0,0,0,0])))
+
+    def test_exp_log_identity(self):
+        """
+        Taking exp of the the log should yield original result
+        
+        Note: the inverse does not hold true in general (log(exp(dq)) != dq)
+        """
+        pure_dq = DualQuaternion.from_dq_array([0, 1, 2, 3, 0, 2, -1, 1]).normalized()
+        self.assertEqual(pure_dq.log().exp(), pure_dq)
+
     def test_pow(self):
         expected_result = self.normalized_dq * self.normalized_dq
         received_result = self.normalized_dq.pow(2)
+        print("Expected result:", expected_result)
+        print("Received result:", received_result)
+        print("nomrmalized_dq:", self.normalized_dq)
         self.assertEqual(received_result, expected_result)
 
-        expected_result = self.random_dq * self.random_dq
-        received_result = self.random_dq.pow(2)
-        self.assertEqual(received_result, expected_result)
+    def test_sqrt_pow(self):
+        """sqrt(dq) ?= pow(dq, 0.5)"""
+        sqrt = DualQuaternion.sqrt(self.normalized_dq)
+        pow12 = self.normalized_dq.pow(0.5)
+        self.assertEqual(sqrt, pow12)
+
+    def test_sclerp_shortest_path(self):
+        """Test that ScLERP always chooses the shortest path between two dual quaternions
+        
+        Since dual quaternions have a double cover property (both dq and -dq represent
+        the same transformation), ScLERP should automatically choose the shorter path
+        by ensuring the quaternion dot product is positive.
+        """
+        # Test case 1: 200 degree rotation (should use 160° short path)
+        start_dq = DualQuaternion.identity()
+        
+        angle_200 = 200 * np.pi / 180  # 200 degrees in radians
+        end_rotation = Quaternion(axis=[0, 0, 1], angle=angle_200)
+        end_translation = [1, 0, 0]
+        end_dq = DualQuaternion.from_quat_pose_array([
+            end_rotation.w, end_rotation.x, end_rotation.y, end_rotation.z,
+            *end_translation
+        ])
+        
+        # Test with the original dual quaternion vs negated version
+        midpoint_original = DualQuaternion.sclerp(start_dq, end_dq, 0.5)
+        end_dq_negated = DualQuaternion(-end_dq.q_r, -end_dq.q_d)
+        midpoint_negated = DualQuaternion.sclerp(start_dq, end_dq_negated, 0.5)
+        
+        # Both should represent the same transformation at the endpoints
+        self.assertEqual(end_dq, end_dq_negated)
+        
+        # The implementation should automatically choose the positive dot product path
+        # So both interpolations should yield similar results (both taking the shorter path)
+        _, _, theta_mid_original, _ = midpoint_original.screw()
+        _, _, theta_mid_negated, _ = midpoint_negated.screw()
+        
+        self.assertAlmostEqual(abs(theta_mid_original), abs(theta_mid_negated), places=2)
+        
+        # The midpoint angle should be around 80° (half of 160° short path)
+        # rather than 100° (half of 200° long path)
+        expected_short_path_mid = (360 - 200) * np.pi / 180 / 2  # 80 degrees
+        actual_mid = abs(theta_mid_original)
+        
+        # Should be closer to 80° than to 100°
+        self.assertLess(abs(actual_mid - expected_short_path_mid), 
+                       abs(actual_mid - angle_200/2))
+        
+        # Test case 2: 270 degree rotation (should use 90° short path)
+        large_angle = 270 * np.pi / 180  # 270 degrees
+        large_rotation = Quaternion(axis=[0, 1, 0], angle=large_angle)
+        large_dq = DualQuaternion.from_quat_pose_array([
+            large_rotation.w, large_rotation.x, large_rotation.y, large_rotation.z,
+            0, 1, 0  # Translation along Y
+        ])
+        
+        midpoint_large = DualQuaternion.sclerp(start_dq, large_dq, 0.5)
+        midpoint_large_neg = DualQuaternion.sclerp(start_dq, 
+                                                   DualQuaternion(-large_dq.q_r, -large_dq.q_d), 
+                                                   0.5)
+        
+        # Both should take the same short path
+        _, _, theta_large_mid, _ = midpoint_large.screw()
+        _, _, theta_large_mid_neg, _ = midpoint_large_neg.screw()
+        
+        self.assertAlmostEqual(abs(theta_large_mid), abs(theta_large_mid_neg), places=2)
+        
+        # The midpoint should be around 45° (half of 90° short path)
+        expected_short_mid = np.pi / 4  # 45 degrees
+        self.assertLess(abs(theta_large_mid), np.pi/2)  # Should be less than 90°
+        self.assertAlmostEqual(abs(theta_large_mid), expected_short_mid, places=1)
+        
+        # Test case 3: Rotation that exceeds 180° (181°, should use 179° short path)
+        critical_angle = 181 * np.pi / 180  # 181 degrees
+        critical_rotation = Quaternion(axis=[1, 0, 0], angle=critical_angle)
+        critical_dq = DualQuaternion.from_quat_pose_array([
+            critical_rotation.w, critical_rotation.x, critical_rotation.y, critical_rotation.z,
+            0, 0, 1  # Translation along Z
+        ])
+        
+        dot_critical = start_dq.q_r.w * critical_dq.q_r.w + np.dot(start_dq.q_r.vector, critical_dq.q_r.vector)
+        
+        # At 181°, the dot product should be negative (indicating long path)
+        self.assertLess(dot_critical, 0)
+        
+        # ScLERP should automatically use the short path
+        midpoint_critical = DualQuaternion.sclerp(start_dq, critical_dq, 0.5)
+        _, _, theta_critical_mid, _ = midpoint_critical.screw()
+        
+        # Should be around 89.5° (half of 179° short path), not ~90.5° (half of 181°)
+        expected_short_mid = (360 - 181) * np.pi / 180 / 2  # Half of the 179° short path
+        self.assertLess(abs(theta_critical_mid), np.pi/2)  # Should be less than 90°
+        self.assertAlmostEqual(abs(theta_critical_mid), expected_short_mid, places=1)
 
 
 if __name__ == '__main__':

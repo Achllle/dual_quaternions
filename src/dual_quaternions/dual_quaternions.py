@@ -11,7 +11,7 @@ import json
 
 class DualQuaternion(object):
     """
-    dual number representation of quaternions to represent rigid transforms
+    dual number representation of quaternions to represent rigid transforms.
 
     A quaternion q can be represented as q_r + q_d * eps with eps^2 = 0 and eps != 0
 
@@ -26,6 +26,9 @@ class DualQuaternion(object):
     $ dq = DualQuaternion.from_translation_vector([x y z])
     $ dq = DualQuaternion.identity() --> zero translation, unit rotation
     $ dq = DualQuaternion.from_screw([lx, ly, lz], [mx, my, mz], theta, d)
+
+    :param normalize: whether the dual quaternion should be explicitly normalized. Only
+    normalized dual quaternions represent rigid body transformations.
 
     The underlying representation for a single quaternion uses the format [w x y z]
     """
